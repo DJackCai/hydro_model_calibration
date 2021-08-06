@@ -1,12 +1,10 @@
+#### ==== This is the R version of the matlab codes for the 
+#### Modello Idrologico Semi-distributio in Continuo (MISDc) model in Brocca et al. (2012)
 
-## ==== This is the R version of the matlab codes for the 
-## Modello Idrologico Semi-distributio in Continuo (MISDc) model in Brocca et al. (2012)
-
-### Original code can be found HERE:
+### Original codes and Data can be found HERE:
 ## https://github.com/IRPIhydrology/MISDc
 
 #### Main script 
-install.packages("mSTEM")
 rm(list = ls())
 graph.theme.beta<-
   theme(axis.title=element_text(size=14),axis.text = element_text(size=11),plot.title = element_text(hjust=0.5,size=14),legend.text = element_text(size=12),legend.title = element_text(size=14))
@@ -15,23 +13,21 @@ library(lubridate)
 library(pracma)
 library(ggplot2)
 
-# discretise the MISDc model 
+## Load the data 
 data.mat<-read.table("migi_0205_daily.txt")
 date<-data.mat[,1]
-# Change the datenum format in matlab to UTC date format in R
+#### Important: Change the datenum format in matlab to UTC date format in R
 date.Rformat<-as.POSIXct((date - 719529)*86400, origin = "1970-01-01", tz = "UTC")
 
 data.mat.new<-data.mat
 data.mat.new[,1]<-date.Rformat
 datamat<-data.mat.new
-#PARS = X_INIT;Ab = 137
-#X_INIT<-c(0.4292,242.4420,10,1.4417,1.5316,1.7985,4.4634,2.6975,15.4304,7.4725)
+X_INIT_cali<-c(0.4292,242.4420,10,1.4417,1.5316,1.7985,4.4634,2.6975,15.4304,7.4725)
 
 MISDc.simu<-function(datamat,PARS,Ab,name=NA) {
 # datamat:  a) date (in numeric Matlab date numbers format,need to translate to R data) 
 # b) rainfall depth (in mm)
 # c) air temperature (°C) # d) observed discharge data (m^3/s)
-  
  M<-dim(datamat)[1] # total number of time steps 
  date<-datamat[,1]
  RAIN<-datamat[,2]; TEMP<-datamat[,3]; Qobs<-datamat[,4]
@@ -40,7 +36,7 @@ MISDc.simu<-function(datamat,PARS,Ab,name=NA) {
  delta_T<-as.numeric(delta_T)
  Month<-month(date)
  
- #### PARS: model parameters input values (guess, or calibrated values)
+ #### PARS: model parameters input values
  Frac.sz.init<-PARS[1]  # initial fraction of surface wetness
  Wmax.rz<-PARS[2]  # total water capacity in root-zone
  m1<-PARS[3]  # exponent of drainage of surface layer
@@ -53,7 +49,6 @@ MISDc.simu<-function(datamat,PARS,Ab,name=NA) {
  KS2<-PARS[10] # hydraulic conductivity in root-zone
  Wmax.sz<-150   # maximum water capacity in surface layer treated as fixed
  
- # other time step
  dt=0.2 # computation time step in hour 
  # hydraulic conductivity: mm/h --> mm/delta_T
  KS1<-KS1*(delta_T)
@@ -131,7 +126,7 @@ MISDc.simu<-function(datamat,PARS,Ab,name=NA) {
   temp2<-conv(IUH2,BF_int)
  # Qsim1<-temp2[seq(1,M*round(1/dt),round(1/dt))]*(Ab*1000/delta_T/3600);  # baseflow component 
   
-   Qsim<-( temp1[seq(1,M*round(1/dt),round(1/dt))] + temp2[seq(1,M*round(1/dt),round(1/dt))]) *(Ab*1000/delta_T/3600)
+ Qsim<-( temp1[seq(1,M*round(1/dt),round(1/dt))] + temp2[seq(1,M*round(1/dt),round(1/dt))]) *(Ab*1000/delta_T/3600)
   # calculate streamflow prediction performance 
   RMSE<-( mean((Qsim-Qobs)**2,na.rm=T) ) ^0.5
   NS<-1-(sum((Qsim-Qobs)**2,na.rm=T)/sum((Qobs-mean(Qobs,na.rm = T))**2,na.rm=T))
@@ -142,15 +137,14 @@ MISDc.simu<-function(datamat,PARS,Ab,name=NA) {
   assign("streamdf",df.stream,envir = globalenv())
   assign(paste0("streamplot_",name),ggplot(df.stream,aes(x=date,y=Qobs))+geom_line(col="black",linetype="dashed")+
    geom_line(col="green",linetype="solid",size=2), envir = globalenv())
-  return(list(RMSE=RMSE,NS=NS,KGE=KGE,Qsim=Qsim,RO_int,BF_int,temp1,temp2))
+  return(list(RMSE=RMSE,NS=NS,KGE=KGE,Qsim=Qsim))
 }
+### Visualise the results 
 streamplot_Try+geom_line(data=streamdf,aes(x=date,y=Qsim),col="red",linetype="dashed")+theme_classic()+
   annotate("text", x=streamdf$date[500], y=50, label= paste("NSE =",round(Testrun.out[[2]],4),"KGE =",round(Testrun.out[[3]],4)),size=5)+
   graph.theme.beta
 
-max(Testrun.out[[4]])
-plot(Testrun.out[[4]],type="l")
-# GIUH for surface runoff
+### GIUH for surface runoff
 IUH_comp<-function(gamma1,Ab,dt,delta_T){
   Lag=(gamma1*1.19*(Ab^0.33))/delta_T
   hp=0.8/Lag
@@ -161,7 +155,7 @@ IUH_comp<-function(gamma1,Ab,dt,delta_T){
   IUH.GIUH<-interp1(t,IUH_0,ti)  
   return(IUH.GIUH)  # x,y, points to interpolate  
   }
-
+###  Nash IUH for baseflow component 
 IUH_NASH<-function(n, gamma1, Ab, dt, delta_T) {
   K=(gamma1*1.19*(Ab^0.33))/delta_T
   time<-seq(0,100,dt) # return a vector 
@@ -169,7 +163,7 @@ IUH_NASH<-function(n, gamma1, Ab, dt, delta_T) {
   return(IUH.linear)
 }
 
-
+### Model to account for snow water equivalent
 snow_model<-function(precipitation,temperature,temp_min,temp_max,Cm) {
   rainfall<-snowfall<-SWE_snowpack<-SWE_melting<-matrix(nrow=length(precipitation),ncol=1)
   if ( is.nan(precipitation[1,1]) == T | is.nan(temperature[1,1])==T) {snowfall[1,1]=precipitation[1,1]=NaN
@@ -218,17 +212,12 @@ snow_model<-function(precipitation,temperature,temp_min,temp_max,Cm) {
   snowfall[i,1] = precipitation[i,1] - rainfall[i,1];
   SWE_snowpack[i,1] = SWE_snowpack[i-1,1] + snowfall[i,1];
   SWE_melting[i,1] = 0;
-  }
-  } 
-
+  } } 
   return(list(rainfall,SWE_melting,SWE_snowpack))
 }
 
-
-# cor(cbind(c(1,2,3),c(4,21,32)))
-# KGE time series 
+# KGE for model metric
 klingupta<-function(mod, obs) {
-  mod<-Qsim; obs<-Qobs
   mod[is.na(mod)==T]<-NaN
   flows<-cbind(mod,obs)
   flows<-na.omit(flows)
@@ -244,31 +233,34 @@ klingupta<-function(mod, obs) {
   return(kge)
 }
 
+##### Calibration of model parameters 
 convert_adim<-function(X0){
   LOW=c(0.1,100,2,0.1,0.5,0.4,1,0.1/24,5,0.01)
   UP<-c(0.9,3000,10,40,3.5,3.0,15,3,35,65)
   X=(LOW)+(UP-LOW)*X0
   return(X)
-}
-
-calibOK<-function(X0,data,Ab){
-  X<-convert_adim(X0)
+} 
+# Idea: optimise the weighting parameter x0 between the parameter range
+calibOK<-function(x0,data,Ab){
+  X<-convert_adim(x0)  
   output<-MISDc.simu(datamat = data,PARS = X,Ab = Ab)
-  KGE<-output[[3]]
+  KGE<-output$KGE
+  err<-1-KGE
   return(1-KGE)  # error term to be minimised  
 }
-X_INIT<-c(0.05,rep(0.1,9))
-cal_MISDc(data = data.mat.new,X_init =X_INIT, Ab = 137)
+### Need to comment out the fixed the parameter value after debugging
 
 cal_MISDc<-function(data,X_init,Ab) {
   NPAR<-10
-  X_init<-X_INIT
-  data<-data.mat.new
-  Res<-fmincon(x0 = X_init,lb = rep(0,10),ub=rep(1,10),fn = calibOK,maxiter = 200,maxfeval = 800)
-  X<-convert_adim(Res) # calibrated parameter 
-  outputs<-MISDc.simu(datamat = data,PARS = X,Ab = Ab)
+  Res<-fmincon(x0 = X_init,lb = rep(0,10),ub=rep(1,10),fn = calibOK,data=data,Ab=Ab,maxiter = 300,maxfeval = 1000,tol = 1e-5)
+  #Res<-optim(par=as.matrix(X_init),fn=calibOK,method = "L-BFGS-B",lower = rep(0,10),upper=rep(1,10),data=data,Ab=Ab,control = list(maxit=500,trace=1))
+  X<-convert_adim(Res$par) # calibrated parameters, transformed to the true parameter range
+  outputs<-MISDc.simu(datamat = data,PARS = X,Ab = Ab)  # final run of the model using calibrated parameters 
+  return(outputs)
 }
 
-Testrun.out<-MISDc.simu(data.mat.new,PARS = X_INIT, Ab = 137,name = "Try")
+### Check the consistency in results: direct calibration & output + input the calibrated values 
+cali.modelrun<-cal_MISDc(data = data.mat.new,X_init =X_INIT, Ab = 137)
+Testrun.out<-MISDc.simu(data.mat.new,PARS = X_INIT_cali, Ab = 137,name = "Try")
 print(paste("NSE =",round(Testrun.out[[2]],4),"KGE =",round(Testrun.out[[3]],4)))
-
+print(paste("NSE =",round(cali.modelrun[[2]],4),"KGE =",round(cali.modelrun[[3]],4)))
