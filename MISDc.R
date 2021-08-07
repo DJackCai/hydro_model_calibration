@@ -264,3 +264,7 @@ cali.modelrun<-cal_MISDc(data = data.mat.new,X_init =X_INIT, Ab = 137)
 Testrun.out<-MISDc.simu(data.mat.new,PARS = X_INIT_cali, Ab = 137,name = "Try")
 print(paste("NSE =",round(Testrun.out[[2]],4),"KGE =",round(Testrun.out[[3]],4)))
 print(paste("NSE =",round(cali.modelrun[[2]],4),"KGE =",round(cali.modelrun[[3]],4)))
+### Visualise the results 
+streamplot_Try+geom_line(data=streamdf,aes(x=date,y=Qsim),col="red",linetype="dashed")+theme_classic()+
+  annotate("text", x=streamdf$date[500], y=50, label= paste("NSE =",round(Testrun.out[[2]],4),"KGE =",round(Testrun.out[[3]],4)),size=5)+
+  graph.theme.beta
