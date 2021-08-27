@@ -164,6 +164,10 @@ MISDc.sim<-function(DATA,Frac.sz.init,Wmax.rz,m1,KS1,tau_q,tau_s,Kc,alpha,m2,KS2
       return(U)  }
 }
 
+### Read the data for running the model. Data also uploaded in the repo. 
+
+# Try fitByOptim
+data.136111.Cali.HMD1<-read.zoo("data.136111.Cali.HMD.csv",header=T,index.column = 1,sep=",")
 MISDc.form.136111=hydromad(DATA=data.136111.Cali.HMD,sma="MISDc",warmup = 365,
                            return_state=F,Xs_0=0,Xq_0=0,Routeornot=T)
 set.seed(1)
