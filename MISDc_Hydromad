@@ -173,3 +173,32 @@ MISDc.form.136111=hydromad(DATA=data.136111.Cali.HMD,sma="MISDc",warmup = 365,
 set.seed(1)
 hmd.MISDc.136111.Cali<-fitByOptim(MISDc.form.136111,hmadstat("r.squared"))
 
+######### 10.27 Update: Conduct Sobol' method to assess parameter sensitivity in this model 
+library(sensitivity)
+library(hydromad)
+## Define the KGE star objective function 
+hydromad.stats("KGEstar" = function(Q, X,...) {
+  KGE<-klingupta(mod = X,obs = Q)
+  KGE/(2-KGE)
+})
+
+#### Run Sobol' method for global sensitivity analysis
+n <- 1000
+set.seed(1)
+ss.403217.long.KGEstar<- sobol2002(model = evalPars,
+                                   ## Draw two random samples of parameters
+                                   X1 =parameterSets(getFreeParsRanges(modx),n),
+                                   X2 = parameterSets(getFreeParsRanges(modx),n),
+                                   ## Number of bootstrap replicates
+                                   nboot = 4,
+                                   ## Arguments to be passed to evalPars
+                                   object=modx,
+                                   
+                                   objective=~hmadstat("KGEstar")(Q,X)
+                                   
+)
+## Store the results of FSI and TSI 
+FSI<-ss.403217.long$V$original
+TSI<-ss.403217.long$T$original
+
+
